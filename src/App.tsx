@@ -5,8 +5,9 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { challengesData, ChallengeData } from './data/challenges';
+import { UOSSM_LOGO_DATA_URI } from './data/uossmLogo';
 
-const UOSSM_LOGO_PATH = '/assets/aistudio/IMG_________________1e51f46a.jpg';
+const UOSSM_LOGO_PATH = UOSSM_LOGO_DATA_URI;
 
 function shadeColor(color: string, percent: number): string {
   let R = parseInt(color.substring(1, 3), 16);
@@ -803,6 +804,17 @@ export default function App() {
             <span className="icon-3d-glyph text-base">🔄</span>
             <span className="hidden sm:inline">إعادة ضبط</span>
           </button>
+
+          {/* Download Standalone HTML for GitHub / Offline */}
+          <a
+            href="./uossm-wheel-standalone.html"
+            download="index.html"
+            className="btn-3d-slate px-3.5 py-2 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer text-emerald-300 whitespace-nowrap"
+            title="تحميل ملف index.html مستقل تماماً للرفع المباشر على GitHub أو التشغيل على البروجكتر بدون إنترنت"
+          >
+            <span className="icon-3d-glyph text-base">📥</span>
+            <span className="hidden md:inline">نسخة GitHub / أوفلاين</span>
+          </a>
 
           {/* Projector Fullscreen Button */}
           <button
