@@ -57,6 +57,12 @@ export default function App() {
   // Gratitude Stars State (Challenge 7)
   const [litStars, setLitStars] = useState<boolean[]>([false, false, false]);
 
+  // Offline / GitHub Export Modal State
+  const [showExportModal, setShowExportModal] = useState(false);
+  const [standaloneHtml, setStandaloneHtml] = useState<string>('');
+  const [standaloneBlobUrl, setStandaloneBlobUrl] = useState<string>('');
+  const [copySuccess, setCopySuccess] = useState(false);
+
   // Refs for Canvas & Animation
   const wheelCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -81,6 +87,29 @@ export default function App() {
     };
     document.addEventListener('fullscreenchange', onFsChange);
     return () => document.removeEventListener('fullscreenchange', onFsChange);
+  }, []);
+
+  useEffect(() => {
+    let activeUrl = '';
+    fetch('./uossm-wheel-standalone.html')
+      .then((r) => (r.ok ? r.text() : Promise.reject()))
+      .then((txt) => {
+        setStandaloneHtml(txt);
+        const blob = new Blob([txt], { type: 'text/html;charset=utf-8' });
+        activeUrl = URL.createObjectURL(blob);
+        setStandaloneBlobUrl(activeUrl);
+      })
+      .catch(() => {
+        // Fallback to current document HTML if standalone file is not fetched
+        const fallbackTxt = '<!doctype html>\n' + document.documentElement.outerHTML;
+        setStandaloneHtml(fallbackTxt);
+        const blob = new Blob([fallbackTxt], { type: 'text/html;charset=utf-8' });
+        activeUrl = URL.createObjectURL(blob);
+        setStandaloneBlobUrl(activeUrl);
+      });
+    return () => {
+      if (activeUrl) URL.revokeObjectURL(activeUrl);
+    };
   }, []);
 
   const numSegments = challengesData.length;
@@ -806,15 +835,30 @@ export default function App() {
           </button>
 
           {/* Download Standalone HTML for GitHub / Offline */}
-          <a
-            href="./uossm-wheel-standalone.html"
-            download="index.html"
+          <button
+            onClick={() => {
+              setCopySuccess(false);
+              setShowExportModal(true);
+              playTickSound(1.2);
+              if (standaloneBlobUrl) {
+                try {
+                  const a = document.createElement('a');
+                  a.href = standaloneBlobUrl;
+                  a.download = 'uossm-wheel-offline.html';
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                } catch {
+                  // Modal is already open with direct download & 1-click copy
+                }
+              }
+            }}
             className="btn-3d-slate px-3.5 py-2 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer text-emerald-300 whitespace-nowrap"
-            title="تحميل ملف index.html مستقل تماماً للرفع المباشر على GitHub أو التشغيل على البروجكتر بدون إنترنت"
+            title="تحميل ملف HTML واحد مستقل تماماً للتشغيل بدون إنترنت (أوفلاين) أو للرفع على GitHub"
           >
             <span className="icon-3d-glyph text-base">📥</span>
-            <span className="hidden md:inline">نسخة GitHub / أوفلاين</span>
-          </a>
+            <span>تحميل أوفلاين / GitHub</span>
+          </button>
 
           {/* Projector Fullscreen Button */}
           <button
@@ -1456,6 +1500,133 @@ export default function App() {
                 className="btn-3d-slate px-5 py-3 rounded-2xl text-slate-300 font-bold text-sm sm:text-base cursor-pointer"
               >
                 إغلاق النافذة
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* =====================================================================
+          5. OFFLINE & GITHUB EXPORT MODAL (GUARANTEED DOWNLOAD / 1-CLICK COPY)
+         ===================================================================== */}
+      {showExportModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md">
+          <div className="modal-enter relative w-full max-w-2xl bg-gradient-to-b from-[#132544] via-[#0D1A31] to-[#091224] border-2 border-emerald-400 rounded-3xl p-5 sm:p-7 shadow-[0_25px_70px_rgba(0,0,0,0.9)] text-right max-h-[92vh] overflow-y-auto">
+            <button
+              onClick={() => setShowExportModal(false)}
+              className="btn-3d-slate absolute top-4 left-4 w-10 h-10 rounded-xl text-slate-200 hover:text-white flex items-center justify-center text-lg cursor-pointer"
+            >
+              <i className="fa-solid fa-xmark" />
+            </button>
+
+            <div className="flex items-center gap-3 mb-4">
+              <div
+                className="icon-3d-box w-14 h-14 text-3xl shrink-0"
+                style={{ background: 'linear-gradient(145deg, #10B981, #047857)' }}
+              >
+                <span className="icon-3d-glyph">📥</span>
+              </div>
+              <div>
+                <h3 className="text-xl sm:text-2xl font-black text-white">
+                  حفظ نسخة الأوفلاين و GitHub
+                </h3>
+                <p className="text-xs sm:text-sm text-emerald-300 font-semibold">
+                  ملف HTML واحد مستقل تماماً (بداخله شعار UOSSM والألوان والأصوات بدون إنترنت)
+                </p>
+              </div>
+            </div>
+
+            {/* Option 1: Direct Download + Copy Code */}
+            <div className="bg-[#071022]/90 border border-slate-700 rounded-2xl p-4 sm:p-5 mb-4 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                {standaloneBlobUrl && (
+                  <a
+                    href={standaloneBlobUrl}
+                    download="uossm-wheel-offline.html"
+                    className="btn-3d-orange px-5 py-3 rounded-2xl text-white font-black text-sm sm:text-base flex items-center gap-2 cursor-pointer"
+                  >
+                    <span className="icon-3d-glyph text-xl">💾</span>
+                    <span>اضغطي هنا لتنزيل الملف (uossm-wheel-offline.html)</span>
+                  </a>
+                )}
+
+                <button
+                  onClick={() => {
+                    if (!standaloneHtml) return;
+                    navigator.clipboard
+                      .writeText(standaloneHtml)
+                      .then(() => {
+                        setCopySuccess(true);
+                        playWinChime();
+                      })
+                      .catch(() => {
+                        const ta = document.getElementById(
+                          'offlineHtmlTextarea'
+                        ) as HTMLTextAreaElement | null;
+                        if (ta) {
+                          ta.select();
+                          document.execCommand('copy');
+                          setCopySuccess(true);
+                          playWinChime();
+                        }
+                      });
+                  }}
+                  className="btn-3d-slate px-5 py-3 rounded-2xl text-emerald-300 font-black text-sm sm:text-base flex items-center gap-2 cursor-pointer"
+                >
+                  <span className="icon-3d-glyph text-xl">
+                    {copySuccess ? '✅' : '📋'}
+                  </span>
+                  <span>
+                    {copySuccess
+                      ? 'تم نسخ الكود بالكامل بنجاح!'
+                      : 'نسخ الكود الكامل للملف (Copy HTML)'}
+                  </span>
+                </button>
+              </div>
+
+              {copySuccess && (
+                <div className="bg-emerald-950/80 border border-emerald-400/60 rounded-xl p-3 text-xs sm:text-sm text-emerald-200 font-bold">
+                  ✅ تم نسخ الكود الكامل! الآن افتحي أي ملف نصي جديد على جهازكِ (أو داخل GitHub) والصقي الكود (`Ctrl + V`) واحفظيه باسم <code className="text-white font-mono">index.html</code>.
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs text-slate-300 font-bold mb-1.5">
+                  أو انسخي الكود مباشرة من المربع التالي (`Ctrl + A` ثم `Ctrl + C`):
+                </label>
+                <textarea
+                  id="offlineHtmlTextarea"
+                  readOnly
+                  value={standaloneHtml}
+                  onClick={(e) => (e.target as HTMLTextAreaElement).select()}
+                  dir="ltr"
+                  className="w-full h-28 bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-[11px] font-mono text-slate-300 focus:outline-none focus:border-[#EE6B33]"
+                />
+              </div>
+            </div>
+
+            {/* Option 2: Downloading from AI Studio Top Bar */}
+            <div className="bg-[#10203B]/90 border border-[#EE6B33]/50 rounded-2xl p-4 text-xs sm:text-sm text-slate-200 space-y-2">
+              <h4 className="font-black text-[#FF854D] text-sm sm:text-base flex items-center gap-2">
+                <span>💡</span>
+                <span>طريقة بديلة مضمونة من أعلى شاشة AI Studio:</span>
+              </h4>
+              <p className="leading-relaxed">
+                إذا كانت نافذة المعاينة تمنع التنزيل المباشر في متصفحكِ، اضغطي على أيقونة{' '}
+                <strong className="text-white">تنزيل المشروع (Download ZIP)</strong> الموجودة في{' '}
+                <strong className="text-amber-300">أعلى يمين شاشة AI Studio الرئيسية</strong>، وعند فك الضغط ستجدين بداخل مجلد{' '}
+                <code className="text-emerald-300 font-mono">public</code> ملفاً جاهزاً اسمه{' '}
+                <code className="text-emerald-300 font-mono">uossm-wheel-standalone.html</code>{' '}
+                يعمل أوفلاين 100% بمجرد النقر عليه مرتين!
+              </p>
+            </div>
+
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="btn-3d-slate px-6 py-2.5 rounded-xl text-slate-200 font-bold text-sm cursor-pointer"
+              >
+                إغلاق
               </button>
             </div>
           </div>
