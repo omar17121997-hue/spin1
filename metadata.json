@@ -1,0 +1,6 @@
+{
+  "name": "عجلة الحظ – اختاري تحدّيكِ",
+  "description": "فقرة تفاعلية ممتعة ودعم نفسي وتفريغ انفعالي للسيدات مع عجلة الحظ التفاعلية",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
