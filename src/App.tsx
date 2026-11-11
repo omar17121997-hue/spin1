@@ -5,9 +5,10 @@
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import { challengesData, ChallengeData } from './data/challenges';
-import { UOSSM_LOGO_DATA_URI } from './data/uossmLogo';
+import { UOSSM_LOGO_DATA_URI, ICNA_LOGO_DATA_URI } from './data/uossmLogo';
 
-const UOSSM_LOGO_PATH = UOSSM_LOGO_DATA_URI;
+const UOSSM_LOGO_FALLBACK = '/assets/aistudio/IMG_________________1e51f46a.jpg';
+const ICNA_LOGO_FALLBACK = '/assets/aistudio/IMG_________________344aeab6.jpg';
 
 function shadeColor(color: string, percent: number): string {
   let R = parseInt(color.substring(1, 3), 16);
@@ -36,7 +37,11 @@ export default function App() {
   const [noRepeat, setNoRepeat] = useState(true);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [pointerTick, setPointerTick] = useState(false);
-  const [logoError, setLogoError] = useState(false);
+  const [uossmLogoSrc, setUossmLogoSrc] = useState<string>(UOSSM_LOGO_DATA_URI);
+  const [icnaLogoSrc, setIcnaLogoSrc] = useState<string>(ICNA_LOGO_DATA_URI);
+  const [uossmLogoError, setUossmLogoError] = useState(false);
+  const [icnaLogoError, setIcnaLogoError] = useState(false);
+
   const [statusHtml, setStatusHtml] = useState<string>(
     'اضغطي على زر <span class="text-[#FF854D] font-black">SPIN</span> لتدوير العجلة أو اختاري رقماً مباشرة!'
   );
@@ -64,6 +69,7 @@ export default function App() {
   const [copySuccess, setCopySuccess] = useState(false);
 
   // Refs for Canvas & Animation
+  const appContainerRef = useRef<HTMLDivElement | null>(null);
   const wheelCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const bgCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const confettiCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -83,10 +89,18 @@ export default function App() {
 
   useEffect(() => {
     const onFsChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      const fsElem =
+        document.fullscreenElement ||
+        (document as unknown as { webkitFullscreenElement?: Element }).webkitFullscreenElement;
+      setIsFullscreen(Boolean(fsElem));
+      window.dispatchEvent(new Event('resize'));
     };
     document.addEventListener('fullscreenchange', onFsChange);
-    return () => document.removeEventListener('fullscreenchange', onFsChange);
+    document.addEventListener('webkitfullscreenchange', onFsChange);
+    return () => {
+      document.removeEventListener('fullscreenchange', onFsChange);
+      document.removeEventListener('webkitfullscreenchange', onFsChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -100,7 +114,6 @@ export default function App() {
         setStandaloneBlobUrl(activeUrl);
       })
       .catch(() => {
-        // Fallback to current document HTML if standalone file is not fetched
         const fallbackTxt = '<!doctype html>\n' + document.documentElement.outerHTML;
         setStandaloneHtml(fallbackTxt);
         const blob = new Blob([fallbackTxt], { type: 'text/html;charset=utf-8' });
@@ -231,7 +244,7 @@ export default function App() {
   }, []);
 
   const launchConfetti = useCallback(() => {
-    const colors = ['#EE6B33', '#FF854D', '#F59E0B', '#38BDF8', '#E2E8F0', '#10B981'];
+    const colors = ['#EE6B33', '#FF854D', '#16A34A', '#F59E0B', '#38BDF8', '#E2E8F0'];
     const pieces = [];
     for (let i = 0; i < 120; i++) {
       pieces.push({
@@ -306,7 +319,7 @@ export default function App() {
       ctx.beginPath();
       ctx.arc(bx, by, 5, 0, Math.PI * 2);
       ctx.fillStyle = i % 2 === 0 ? '#FF854D' : '#F8FAFC';
-      ctx.shadowColor = i % 2 === 0 ? '#EE6B33' : '#38BDF8';
+      ctx.shadowColor = i % 2 === 0 ? '#EE6B33' : '#16A34A';
       ctx.shadowBlur = 10;
       ctx.fill();
     }
@@ -398,7 +411,6 @@ export default function App() {
       ctx.translate(Math.cos(midAngle) * textRadiusInner, Math.sin(midAngle) * textRadiusInner);
       ctx.rotate(midAngle + Math.PI / 2);
 
-      // Draw 3D emoji icon in inner ring
       ctx.font = '26px Cairo, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -413,7 +425,7 @@ export default function App() {
       ctx.restore();
     }
 
-    // 3. Separator Ring between Outer & Inner Ring (UOSSM Orange + Silver)
+    // 3. Separator Ring between Outer & Inner Ring
     ctx.beginPath();
     ctx.arc(0, 0, numRingInner, 0, Math.PI * 2);
     ctx.lineWidth = 7;
@@ -443,17 +455,18 @@ export default function App() {
       bgCanvas.height = window.innerHeight;
       confettiCanvas.width = window.innerWidth;
       confettiCanvas.height = window.innerHeight;
+      drawWheel();
     };
     handleResize();
     window.addEventListener('resize', handleResize);
 
-    const stars = Array.from({ length: 42 }, () => ({
+    const stars = Array.from({ length: 40 }, () => ({
       x: Math.random() * window.innerWidth,
       y: Math.random() * window.innerHeight,
       r: Math.random() * 2.4 + 0.7,
       vy: -Math.random() * 0.32 - 0.08,
       alpha: Math.random() * 0.55 + 0.18,
-      color: Math.random() > 0.45 ? '#EE6B33' : '#94A3B8',
+      color: Math.random() > 0.5 ? '#EE6B33' : '#10B981',
     }));
 
     let animId: number;
@@ -722,12 +735,49 @@ export default function App() {
     });
   };
 
-  const toggleFullScreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch(() => {});
+  // Bulletproof Fullscreen handler (works on Phone, Laptop, Projector + iFrame fallback)
+  const toggleFullScreen = async () => {
+    playTickSound(1.15);
+    const docEl = document.documentElement as HTMLElement & {
+      webkitRequestFullscreen?: () => Promise<void>;
+      msRequestFullscreen?: () => Promise<void>;
+    };
+    const doc = document as Document & {
+      webkitFullscreenElement?: Element;
+      webkitExitFullscreen?: () => Promise<void>;
+    };
+
+    const isNativeFs = Boolean(document.fullscreenElement || doc.webkitFullscreenElement);
+
+    if (!isNativeFs && !isFullscreen) {
+      try {
+        if (docEl.requestFullscreen) {
+          await docEl.requestFullscreen();
+        } else if (docEl.webkitRequestFullscreen) {
+          await docEl.webkitRequestFullscreen();
+        } else if (docEl.msRequestFullscreen) {
+          await docEl.msRequestFullscreen();
+        }
+        setIsFullscreen(true);
+      } catch {
+        setIsFullscreen(true);
+      }
     } else {
-      document.exitFullscreen().catch(() => {});
+      try {
+        if (document.fullscreenElement && document.exitFullscreen) {
+          await document.exitFullscreen();
+        } else if (doc.webkitFullscreenElement && doc.webkitExitFullscreen) {
+          await doc.webkitExitFullscreen();
+        }
+      } catch {
+        // Ignore
+      }
+      setIsFullscreen(false);
     }
+
+    setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 120);
   };
 
   const triggerCelebrationSoundAndConfetti = () => {
@@ -736,168 +786,230 @@ export default function App() {
   };
 
   return (
-    <div className="relative flex flex-col justify-between min-h-screen lg:h-screen lg:overflow-hidden w-full select-none">
+    <div
+      ref={appContainerRef}
+      className={`${
+        isFullscreen
+          ? 'fixed inset-0 z-30 w-full h-full overflow-x-hidden overflow-y-auto'
+          : 'relative min-h-screen w-full overflow-x-hidden'
+      } flex flex-col justify-between select-none`}
+    >
       {/* Background Particles Canvas */}
       <canvas ref={bgCanvasRef} className="fixed inset-0 pointer-events-none z-0" />
       {/* Confetti Canvas */}
       <canvas ref={confettiCanvasRef} className="fixed inset-0 pointer-events-none z-50" />
 
       {/* =====================================================================
-          1. HARMONIZED UOSSM CANADA HEADER BAR (PROJECTOR WIDESCREEN READY)
+          1. PROMINENT DUAL-LOGO HEADER BAR (RESPONSIVE FOR PHONE & LAPTOP)
          ===================================================================== */}
-      <header className="relative z-10 w-full max-w-[1840px] mx-auto px-4 sm:px-6 xl:px-10 pt-2.5 pb-2 flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/60 bg-[#0A1428]/80 backdrop-blur-md shadow-[0_4px_25px_rgba(0,0,0,0.45)]">
-        {/* Right Side (RTL): UOSSM Logo + Organization & Activity Title */}
-        <div className="flex items-center gap-3 sm:gap-4">
-          {/* UOSSM Canada Official Logo Frame in 3D Crisp White Container */}
-          <div className="bg-white rounded-2xl px-3 py-1.5 shadow-[0_5px_0_#CBD5E1,0_10px_22px_rgba(0,0,0,0.5)] border-2 border-[#EE6B33] flex items-center justify-center shrink-0 transition transform hover:scale-[1.02]">
-            {!logoError ? (
-              <img
-                src={UOSSM_LOGO_PATH}
-                alt="UOSSM Canada - اتحاد منظمات الرعاية الطبية والإغاثة"
-                referrerPolicy="no-referrer"
-                onError={() => setLogoError(true)}
-                className="h-11 sm:h-13 xl:h-14 w-auto object-contain"
-              />
-            ) : (
-              <div className="flex items-center gap-2 px-2 py-1 text-slate-800 font-black">
-                <span className="text-[#EE6B33] text-xl">UOSSM</span>
-                <span className="text-xs text-slate-600">CANADA</span>
-              </div>
-            )}
-          </div>
-
-          {/* Vertical Divider */}
-          <div className="hidden sm:block h-11 w-[2px] bg-gradient-to-b from-transparent via-[#EE6B33]/70 to-transparent rounded-full" />
-
-          {/* Organization Name + Interactive Title */}
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs sm:text-sm font-extrabold tracking-wide text-[#FF854D]">
-                اتحاد منظمات الرعاية الطبية والإغاثة
-              </span>
-              <span className="text-slate-400 text-xs">•</span>
-              <span className="text-xs sm:text-sm font-bold text-slate-300 tracking-wider">
-                UOSSM CANADA
-              </span>
+      <header className="relative z-20 w-full max-w-[1920px] mx-auto px-3 sm:px-6 xl:px-8 py-2.5 border-b border-slate-700/70 bg-[#081224]/92 backdrop-blur-md shadow-[0_6px_25px_rgba(0,0,0,0.55)] shrink-0">
+        {/* Desktop / Laptop Layout (lg+): [Big UOSSM Logo] --- [Title + Controls] --- [Big ICNA Logo] */}
+        {/* Mobile / Tablet Layout (<lg): Top Row = [Big UOSSM Logo] + [Big ICNA Logo], Bottom Row = [Title + Controls] */}
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-3 w-full">
+          
+          {/* TOP ROW ON MOBILE (Both Logos Side-by-Side, Large & Prominent) / RIGHT LOGO ON DESKTOP */}
+          <div className="w-full lg:w-auto flex items-center justify-between lg:justify-start gap-3 shrink-0">
+            {/* Logo 1: UOSSM CANADA (Right side in RTL) */}
+            <div className="bg-white rounded-2xl px-3 py-1.5 sm:px-4 sm:py-2 shadow-[0_5px_0_#CBD5E1,0_10px_24px_rgba(238,107,51,0.35)] border-2 border-[#EE6B33] flex items-center justify-center transition transform hover:scale-[1.03] shrink-0">
+              {!uossmLogoError ? (
+                <img
+                  src={uossmLogoSrc}
+                  alt="UOSSM Canada - اتحاد منظمات الرعاية الطبية والإغاثة"
+                  referrerPolicy="no-referrer"
+                  onError={() => {
+                    if (uossmLogoSrc !== UOSSM_LOGO_FALLBACK) {
+                      setUossmLogoSrc(UOSSM_LOGO_FALLBACK);
+                    } else {
+                      setUossmLogoError(true);
+                    }
+                  }}
+                  className="h-12 sm:h-15 md:h-16 xl:h-18 w-auto max-w-[42vw] sm:max-w-[230px] xl:max-w-[260px] object-contain"
+                />
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-slate-800 font-black">
+                  <span className="text-[#EE6B33] text-xl">UOSSM</span>
+                  <span className="text-sm text-slate-600">CANADA</span>
+                </div>
+              )}
             </div>
-            <h1 className="text-lg sm:text-2xl xl:text-3xl font-black tracking-wide text-white flex items-center gap-2.5 mt-0.5">
-              <span className="icon-3d-glyph text-2xl sm:text-3xl">🎡</span>
-              <span>عجلة الحظ</span>
-              <span className="text-[#EE6B33]">–</span>
-              <span className="bg-gradient-to-l from-[#FF854D] via-amber-200 to-sky-200 bg-clip-text text-transparent">
-                اختاري تحدّيكِ
-              </span>
-              <span className="hidden xl:inline-block text-xs font-bold text-slate-300 bg-slate-800/80 border border-slate-600/60 px-3 py-1 rounded-xl mr-2">
-                فقرة تفاعلية ودعم نفسي وتفريغ انفعالي للسيدات
-              </span>
-            </h1>
+
+            {/* Logo 2 on Mobile/Tablet (<lg): ICNA Relief Canada on the Opposite Side */}
+            <div className="lg:hidden bg-[#525D6B] rounded-2xl px-2.5 py-1.5 sm:px-3.5 sm:py-2 shadow-[0_5px_0_#16A34A,0_10px_24px_rgba(22,163,74,0.35)] border-2 border-emerald-400 flex items-center justify-center overflow-hidden transition transform hover:scale-[1.03] shrink-0">
+              {!icnaLogoError ? (
+                <img
+                  src={icnaLogoSrc}
+                  alt="ICNA Relief Canada - Muslims For Humanity"
+                  referrerPolicy="no-referrer"
+                  onError={() => {
+                    if (icnaLogoSrc !== ICNA_LOGO_FALLBACK) {
+                      setIcnaLogoSrc(ICNA_LOGO_FALLBACK);
+                    } else {
+                      setIcnaLogoError(true);
+                    }
+                  }}
+                  className="h-12 sm:h-15 md:h-16 w-auto max-w-[42vw] sm:max-w-[230px] object-contain rounded-lg"
+                />
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-white font-black">
+                  <span className="text-emerald-400 text-base">ICNA Relief</span>
+                  <span className="text-xs text-slate-200">Canada</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Left Side (RTL): 3D Tactile Control Buttons */}
-        <div className="flex items-center gap-2 sm:gap-2.5">
-          {/* No-Repeat Toggle */}
-          <label
-            className="btn-3d-slate px-3 py-2 rounded-xl cursor-pointer flex items-center gap-2 text-xs sm:text-sm"
-            title="عدم تكرار الرقم الذي ظهر عند التدوير العشوائي"
-          >
-            <input
-              type="checkbox"
-              checked={noRepeat}
-              onChange={(e) => setNoRepeat(e.target.checked)}
-              className="accent-[#EE6B33] w-4 h-4 rounded cursor-pointer"
-            />
-            <span className="text-slate-100 font-bold whitespace-nowrap">منع تكرار الرقم</span>
-          </label>
+          {/* CENTER: Activity Title & Controls Bar */}
+          <div className="flex flex-col items-center justify-center text-center min-w-0 flex-1 px-1">
+            <div className="hidden sm:flex items-center justify-center gap-2 text-xs xl:text-sm font-bold text-slate-300 mb-1">
+              <span className="text-[#FF854D]">اتحاد منظمات الرعاية الطبية والإغاثة (UOSSM Canada)</span>
+              <span className="text-slate-500">•</span>
+              <span className="text-emerald-400">ICNA Relief Canada (Muslims For Humanity)</span>
+            </div>
 
-          {/* Sound Toggle */}
-          <button
-            onClick={toggleSound}
-            className="btn-3d-slate px-3.5 py-2 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer text-slate-100 whitespace-nowrap"
-            title="تشغيل / كتم الصوت"
-          >
-            <span className="icon-3d-glyph text-base">
-              {soundEnabled ? '🔊' : '🔇'}
-            </span>
-            <span className="hidden md:inline">
-              {soundEnabled ? 'الصوت مفعل' : 'الصوت مكتوم'}
-            </span>
-          </button>
+            <div className="flex flex-col xl:flex-row items-center justify-center gap-2 sm:gap-3">
+              <h1 className="text-lg sm:text-2xl xl:text-3xl font-black tracking-wide text-white flex items-center gap-2">
+                <span className="icon-3d-glyph text-2xl sm:text-3xl">🎡</span>
+                <span>عجلة الحظ</span>
+                <span className="text-[#EE6B33]">–</span>
+                <span className="bg-gradient-to-l from-[#FF854D] via-amber-200 to-emerald-300 bg-clip-text text-transparent">
+                  اختاري تحدّيكِ
+                </span>
+              </h1>
 
-          {/* Reset Button */}
-          <button
-            onClick={resetProgress}
-            className="btn-3d-slate px-3.5 py-2 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer text-amber-200 whitespace-nowrap"
-            title="إعادة ضبط جميع الأرقام"
-          >
-            <span className="icon-3d-glyph text-base">🔄</span>
-            <span className="hidden sm:inline">إعادة ضبط</span>
-          </button>
+              {/* 3D Control Buttons */}
+              <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+                {/* No-Repeat Toggle */}
+                <label
+                  className="btn-3d-slate px-2.5 py-1.5 rounded-xl cursor-pointer flex items-center gap-1.5 text-xs"
+                  title="عدم تكرار الرقم الذي ظهر عند التدوير العشوائي"
+                >
+                  <input
+                    type="checkbox"
+                    checked={noRepeat}
+                    onChange={(e) => setNoRepeat(e.target.checked)}
+                    className="accent-[#EE6B33] w-3.5 h-3.5 rounded cursor-pointer"
+                  />
+                  <span className="text-slate-100 font-bold whitespace-nowrap">منع التكرار</span>
+                </label>
 
-          {/* Download Standalone HTML for GitHub / Offline */}
-          <button
-            onClick={() => {
-              setCopySuccess(false);
-              setShowExportModal(true);
-              playTickSound(1.2);
-              if (standaloneBlobUrl) {
-                try {
-                  const a = document.createElement('a');
-                  a.href = standaloneBlobUrl;
-                  a.download = 'uossm-wheel-offline.html';
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                } catch {
-                  // Modal is already open with direct download & 1-click copy
-                }
-              }
-            }}
-            className="btn-3d-slate px-3.5 py-2 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-bold cursor-pointer text-emerald-300 whitespace-nowrap"
-            title="تحميل ملف HTML واحد مستقل تماماً للتشغيل بدون إنترنت (أوفلاين) أو للرفع على GitHub"
-          >
-            <span className="icon-3d-glyph text-base">📥</span>
-            <span>تحميل أوفلاين / GitHub</span>
-          </button>
+                {/* Sound Toggle */}
+                <button
+                  onClick={toggleSound}
+                  className="btn-3d-slate px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold cursor-pointer text-slate-100 whitespace-nowrap"
+                  title="تشغيل / كتم الصوت"
+                >
+                  <span className="icon-3d-glyph text-sm">
+                    {soundEnabled ? '🔊' : '🔇'}
+                  </span>
+                  <span className="hidden sm:inline">
+                    {soundEnabled ? 'الصوت' : 'مكتوم'}
+                  </span>
+                </button>
 
-          {/* Projector Fullscreen Button */}
-          <button
-            onClick={toggleFullScreen}
-            className="btn-3d-orange px-3.5 py-2 rounded-xl flex items-center gap-2 text-xs sm:text-sm font-black text-white cursor-pointer whitespace-nowrap"
-            title="ملء الشاشة للعرض على البروجكتر"
-          >
-            <i className={isFullscreen ? 'fa-solid fa-compress' : 'fa-solid fa-expand'} />
-            <span className="hidden sm:inline">
-              {isFullscreen ? 'إنهاء ملء الشاشة' : 'عرض ملء الشاشة'}
-            </span>
-          </button>
+                {/* Reset Button */}
+                <button
+                  onClick={resetProgress}
+                  className="btn-3d-slate px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold cursor-pointer text-amber-200 whitespace-nowrap"
+                  title="إعادة ضبط جميع الأرقام"
+                >
+                  <span className="icon-3d-glyph text-sm">🔄</span>
+                  <span className="hidden sm:inline">إعادة ضبط</span>
+                </button>
+
+                {/* Download Offline / GitHub Button */}
+                {!isFullscreen && (
+                  <button
+                    onClick={() => {
+                      setCopySuccess(false);
+                      setShowExportModal(true);
+                      playTickSound(1.2);
+                      if (standaloneBlobUrl) {
+                        try {
+                          const a = document.createElement('a');
+                          a.href = standaloneBlobUrl;
+                          a.download = 'uossm-wheel-offline.html';
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                        } catch {
+                          // Modal is open
+                        }
+                      }
+                    }}
+                    className="btn-3d-slate px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold cursor-pointer text-emerald-300 whitespace-nowrap"
+                    title="حفظ نسخة الأوفلاين و GitHub"
+                  >
+                    <span className="icon-3d-glyph text-sm">📥</span>
+                    <span>أوفلاين</span>
+                  </button>
+                )}
+
+                {/* Projector Fullscreen Button */}
+                <button
+                  onClick={toggleFullScreen}
+                  className="btn-3d-orange px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-black text-white cursor-pointer whitespace-nowrap"
+                  title="ملء الشاشة للعرض على البروجكتر والهاتف"
+                >
+                  <i className={isFullscreen ? 'fa-solid fa-compress' : 'fa-solid fa-expand'} />
+                  <span>{isFullscreen ? 'تصغير الشاشة' : 'ملء الشاشة'}</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* LEFT SIDE ON DESKTOP (lg+): Second Logo (ICNA Relief Canada - Opposite UOSSM Logo) */}
+          <div className="hidden lg:flex items-center gap-2.5 shrink-0">
+            <div className="bg-[#525D6B] rounded-2xl px-3.5 py-1.5 xl:px-4 xl:py-2 shadow-[0_5px_0_#16A34A,0_10px_24px_rgba(22,163,74,0.35)] border-2 border-emerald-400 flex items-center justify-center overflow-hidden transition transform hover:scale-[1.03]">
+              {!icnaLogoError ? (
+                <img
+                  src={icnaLogoSrc}
+                  alt="ICNA Relief Canada - Muslims For Humanity"
+                  referrerPolicy="no-referrer"
+                  onError={() => {
+                    if (icnaLogoSrc !== ICNA_LOGO_FALLBACK) {
+                      setIcnaLogoSrc(ICNA_LOGO_FALLBACK);
+                    } else {
+                      setIcnaLogoError(true);
+                    }
+                  }}
+                  className="h-14 xl:h-18 w-auto max-w-[240px] xl:max-w-[270px] object-contain rounded-lg"
+                />
+              ) : (
+                <div className="flex items-center gap-1.5 px-3 py-1.5 text-white font-black">
+                  <span className="text-emerald-400 text-lg">ICNA Relief</span>
+                  <span className="text-xs text-slate-200">Canada</span>
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
       </header>
 
       {/* =====================================================================
-          2. MAIN PROJECTOR STAGE (FULL VIEWPORT SPREAD across 12 COLUMNS)
+          2. MAIN STAGE (ZERO OVERLAP ON PHONE & FULL WIDESCREEN ON LAPTOP)
          ===================================================================== */}
-      <main className="relative z-10 flex-1 w-full max-w-[1840px] mx-auto px-4 sm:px-6 xl:px-10 py-2 grid grid-cols-1 lg:grid-cols-12 gap-5 xl:gap-8 items-center min-h-0">
+      <main className="relative z-10 w-full max-w-[1920px] mx-auto px-3 sm:px-6 xl:px-8 py-4 lg:py-2 my-auto grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-5 xl:gap-7 items-center">
         {/* RIGHT/CENTER COLUMN (RTL): The Wheel & Action Stage */}
-        <section className="lg:col-span-5 xl:col-span-5 flex flex-col items-center justify-center h-full">
+        <section className="lg:col-span-5 xl:col-span-5 flex flex-col items-center justify-center w-full">
           {/* Status Banner above wheel */}
-          <div className="mb-2.5 px-5 py-2 rounded-2xl bg-[#10203B]/95 border border-[#EE6B33]/50 shadow-[0_6px_20px_rgba(0,0,0,0.45)] text-center flex items-center gap-2.5 max-w-full">
-            <span className="icon-3d-glyph text-lg">🎯</span>
+          <div className="mb-4 px-4 py-2 rounded-2xl bg-[#10203B]/95 border border-[#EE6B33]/50 shadow-[0_4px_16px_rgba(0,0,0,0.45)] text-center flex items-center gap-2 max-w-full">
+            <span className="icon-3d-glyph text-base">🎯</span>
             <span
-              className="text-xs sm:text-sm xl:text-base font-bold text-slate-100"
+              className="text-xs sm:text-sm font-bold text-slate-100"
               dangerouslySetInnerHTML={{ __html: statusHtml }}
             />
           </div>
 
-          {/* The UOSSM 3D Wheel Container - Scales dynamically for Projector */}
-          <div className="wheel-stage w-[min(80vw,390px)] sm:w-[min(70vw,430px)] lg:w-[min(52vh,460px)] xl:w-[min(56vh,520px)] aspect-square my-0.5">
+          {/* The 3D Wheel Container - Clean natural sizing on Phone & Viewport-proportional on Laptop */}
+          <div className="wheel-stage w-[min(84vw,350px)] sm:w-[min(70vw,410px)] lg:w-[min(39vw,50vh)] xl:w-[min(41vw,54vh)] aspect-square my-1">
             <div className="wheel-outer-glow" />
 
             {/* Top 3D Pointer Arrow */}
             <div className={`wheel-pointer ${pointerTick ? 'pointer-tick' : ''}`}>
               <svg
-                width="48"
-                height="50"
+                width="44"
+                height="46"
                 viewBox="0 0 46 48"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
@@ -941,7 +1053,7 @@ export default function App() {
               disabled={isSpinning}
               className="spin-btn-center group"
             >
-              <span className="spin-label text-2xl sm:text-3xl tracking-wider group-hover:scale-105 transition">
+              <span className="spin-label text-xl sm:text-2xl xl:text-3xl tracking-wider group-hover:scale-105 transition">
                 SPIN
               </span>
               <span className="text-[10px] sm:text-xs text-slate-800 font-extrabold mt-0.5">
@@ -951,34 +1063,34 @@ export default function App() {
           </div>
 
           {/* 3D Quick Action Buttons Under Wheel */}
-          <div className="mt-3 flex flex-wrap items-center justify-center gap-3">
+          <div className="mt-4 lg:mt-3 flex flex-wrap items-center justify-center gap-2.5">
             <button
               onClick={() => spinWheel(null)}
               disabled={isSpinning}
-              className="btn-3d-orange px-7 py-2.5 xl:py-3 rounded-2xl text-white font-black text-sm sm:text-base xl:text-lg flex items-center gap-2.5 cursor-pointer disabled:opacity-60"
+              className="btn-3d-orange px-6 py-2.5 rounded-2xl text-white font-black text-sm sm:text-base flex items-center gap-2 cursor-pointer disabled:opacity-60"
             >
-              <span className="icon-3d-glyph text-xl">✨</span>
+              <span className="icon-3d-glyph text-lg">✨</span>
               <span>دوري العجلة الآن!</span>
             </button>
 
             <button
               onClick={triggerCelebrationSoundAndConfetti}
-              className="btn-3d-slate px-5 py-2.5 xl:py-3 rounded-2xl text-amber-200 font-bold text-sm sm:text-base flex items-center gap-2 cursor-pointer"
+              className="btn-3d-slate px-4 py-2.5 rounded-2xl text-amber-200 font-bold text-sm sm:text-base flex items-center gap-2 cursor-pointer"
               title="تحية وتصفيق للمتسابقة"
             >
-              <span className="icon-3d-glyph text-xl">👏</span>
+              <span className="icon-3d-glyph text-lg">👏</span>
               <span>تحية وتشجيع</span>
             </button>
           </div>
         </section>
 
         {/* LEFT COLUMN (RTL): 10 Challenges in a Projector-Friendly 2-Column 3D Grid */}
-        <section className="lg:col-span-7 xl:col-span-7 flex flex-col bg-[#0C182E]/90 border border-slate-600/50 rounded-3xl p-4 sm:p-5 xl:p-6 shadow-[0_20px_50px_rgba(0,0,0,0.65)] backdrop-blur-md">
+        <section className="lg:col-span-7 xl:col-span-7 flex flex-col bg-[#0C182E]/92 border border-slate-600/50 rounded-3xl p-3.5 sm:p-4 xl:p-5 shadow-[0_16px_40px_rgba(0,0,0,0.65)] backdrop-blur-md w-full">
           {/* Panel Header */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-700/80">
-            <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 mb-2.5 border-b border-slate-700/80">
+            <div className="flex items-center gap-2.5">
               <div
-                className="icon-3d-box w-11 h-11 text-2xl shrink-0"
+                className="icon-3d-box w-10 h-10 text-xl shrink-0"
                 style={{
                   background: 'linear-gradient(145deg, #FF854D, #C2410C)',
                 }}
@@ -986,28 +1098,28 @@ export default function App() {
                 <span className="icon-3d-glyph">🎁</span>
               </div>
               <div>
-                <h2 className="text-base sm:text-xl xl:text-2xl font-black text-white">
+                <h2 className="text-base sm:text-lg xl:text-xl font-black text-white">
                   تحديات وأسئلة العجلة التفاعلية (10)
                 </h2>
-                <p className="text-xs sm:text-sm text-slate-300">
+                <p className="text-[11px] sm:text-xs text-slate-300">
                   اضغطي على أي بطاقة لفتح السؤال مباشرة أو لتدوير العجلة نحوه
                 </p>
               </div>
             </div>
 
             {/* Completed Counter */}
-            <div className="flex items-center gap-3">
-              <div className="bg-[#132544] border border-[#EE6B33]/50 px-4 py-1.5 rounded-2xl text-center shadow-inner">
-                <span className="text-[11px] text-slate-300 block font-semibold">المنجز</span>
-                <span className="text-sm sm:text-base font-black text-[#FF854D] tabular-nums">
+            <div className="flex items-center gap-2">
+              <div className="bg-[#132544] border border-[#EE6B33]/50 px-3.5 py-1 rounded-2xl text-center shadow-inner">
+                <span className="text-[10px] text-slate-300 block font-semibold">المنجز</span>
+                <span className="text-xs sm:text-sm font-black text-[#FF854D] tabular-nums">
                   {completedIds.size} / {challengesData.length}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* 10 Challenge Cards in a 2-Column × 5-Row Grid (All visible on Projector without scrolling!) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 xl:gap-3.5">
+          {/* 10 Challenge Cards in a 2-Column × 5-Row Grid on sm+ */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             {challengesData.map((item) => {
               const isDone = completedIds.has(item.id);
               return (
@@ -1016,12 +1128,12 @@ export default function App() {
                   onClick={() => openChallengeModal(item.id)}
                   className={`number-card ${
                     isDone ? 'completed' : ''
-                  } rounded-2xl p-2.5 xl:p-3 flex items-center justify-between gap-2.5 cursor-pointer group`}
+                  } rounded-2xl p-2.5 flex items-center justify-between gap-2 cursor-pointer group`}
                 >
-                  <div className="flex items-center gap-2.5 xl:gap-3 min-w-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
                     {/* 3D Extruded Icon & Number Badge */}
                     <div
-                      className="icon-3d-box w-12 h-12 xl:w-14 xl:h-14 shrink-0 flex flex-col items-center justify-center relative"
+                      className="icon-3d-box w-11 h-11 xl:w-12 xl:h-12 shrink-0 flex flex-col items-center justify-center relative"
                       style={{
                         background: isDone
                           ? 'linear-gradient(145deg, #059669, #065F46)'
@@ -1031,14 +1143,14 @@ export default function App() {
                             )})`,
                       }}
                     >
-                      <span className="icon-3d-glyph text-xl xl:text-2xl leading-none">
+                      <span className="icon-3d-glyph text-lg xl:text-xl leading-none">
                         {item.icon3d}
                       </span>
-                      <span className="text-[11px] font-black text-white/95 leading-none mt-1 bg-black/30 px-1.5 py-0.5 rounded-md tabular-nums">
+                      <span className="text-[10px] font-black text-white/95 leading-none mt-0.5 bg-black/30 px-1.5 py-0.2 rounded tabular-nums">
                         #{item.id}
                       </span>
                       {isDone && (
-                        <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-emerald-400 text-slate-950 font-black rounded-full text-xs flex items-center justify-center border-2 border-slate-900 shadow-md">
+                        <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-emerald-400 text-slate-950 font-black rounded-full text-[10px] flex items-center justify-center border border-slate-900 shadow-md">
                           ✓
                         </span>
                       )}
@@ -1046,10 +1158,10 @@ export default function App() {
 
                     {/* Challenge Title & Category */}
                     <div className="min-w-0">
-                      <h4 className="font-extrabold text-sm xl:text-base text-white group-hover:text-[#FF854D] transition leading-snug line-clamp-1">
+                      <h4 className="font-extrabold text-xs sm:text-sm xl:text-base text-white group-hover:text-[#FF854D] transition leading-snug line-clamp-1">
                         {item.title}
                       </h4>
-                      <div className="flex items-center gap-1.5 mt-0.5 text-xs font-semibold">
+                      <div className="flex items-center gap-1 mt-0.5 text-[11px] font-semibold">
                         <span
                           className={
                             item.isPsych ? 'text-amber-300' : 'text-sky-300'
@@ -1068,7 +1180,7 @@ export default function App() {
                         e.stopPropagation();
                         spinWheel(item.id);
                       }}
-                      className="btn-3d-slate px-2.5 py-1.5 rounded-xl text-[#FF854D] text-xs font-extrabold cursor-pointer whitespace-nowrap"
+                      className="btn-3d-slate px-2.5 py-1.5 rounded-xl text-[#FF854D] text-[11px] font-extrabold cursor-pointer whitespace-nowrap"
                       title="تدوير العجلة لتقف على هذا الرقم"
                     >
                       🎯 تدوير
@@ -1078,7 +1190,7 @@ export default function App() {
                         e.stopPropagation();
                         openChallengeModal(item.id);
                       }}
-                      className="btn-3d-orange px-2.5 py-1.5 rounded-xl text-white text-xs font-extrabold cursor-pointer whitespace-nowrap"
+                      className="btn-3d-orange px-2.5 py-1.5 rounded-xl text-white text-[11px] font-extrabold cursor-pointer whitespace-nowrap"
                     >
                       فتح
                     </button>
@@ -1089,12 +1201,12 @@ export default function App() {
           </div>
 
           {/* Category Legend Bar */}
-          <div className="mt-3 pt-2.5 border-t border-slate-700/70 flex flex-wrap items-center justify-between gap-2 text-xs sm:text-sm text-slate-300 font-semibold">
-            <div className="flex items-center gap-2">
+          <div className="mt-2.5 pt-2 border-t border-slate-700/70 flex flex-wrap items-center justify-between gap-2 text-[11px] sm:text-xs text-slate-300 font-semibold">
+            <div className="flex items-center gap-1.5">
               <span className="icon-3d-glyph">⚡</span>
               <span>الأرقام (1 – 6): تحديات تفاعلية وحماسية</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               <span className="icon-3d-glyph">🌸</span>
               <span>الأرقام (7 – 10): دعم نفسي وتفريغ انفعالي</span>
             </div>
@@ -1105,17 +1217,19 @@ export default function App() {
       {/* =====================================================================
           3. DEDICATED FOOTER WITH DESIGNER SIGNATURE (تصميم ميساء تيسير مهنا)
          ===================================================================== */}
-      <footer className="relative z-10 w-full max-w-[1840px] mx-auto px-4 sm:px-6 xl:px-10 py-2 border-t border-slate-700/60 bg-[#071020]/90 backdrop-blur-md flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-300 font-semibold">
-          <span className="w-2.5 h-2.5 rounded-full bg-[#EE6B33]" />
-          <span>اتحاد منظمات الرعاية الطبية والإغاثة • UOSSM CANADA</span>
+      <footer className="relative z-10 w-full max-w-[1920px] mx-auto px-3 sm:px-6 xl:px-8 py-2 border-t border-slate-700/60 bg-[#071020]/95 backdrop-blur-md flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center gap-2 text-xs text-slate-300 font-semibold">
+          <span className="w-2 h-2 rounded-full bg-[#EE6B33]" />
+          <span>UOSSM CANADA</span>
+          <span className="text-slate-500">•</span>
+          <span className="text-emerald-400">ICNA Relief Canada</span>
         </div>
 
         {/* Designer Credit Pill in Prominent 3D Style */}
-        <div className="flex items-center gap-2.5 bg-gradient-to-r from-[#162947] via-[#1E355B] to-[#162947] border border-[#EE6B33]/60 px-5 py-1.5 rounded-2xl shadow-[0_4px_15px_rgba(238,107,51,0.25)]">
-          <span className="icon-3d-glyph text-lg">✨</span>
+        <div className="flex items-center gap-2 bg-gradient-to-r from-[#162947] via-[#1E355B] to-[#162947] border border-[#EE6B33]/60 px-4 py-1 rounded-2xl shadow-[0_4px_15px_rgba(238,107,51,0.25)]">
+          <span className="icon-3d-glyph text-base">✨</span>
           <span className="text-xs sm:text-sm text-slate-200 font-bold">تصميم:</span>
-          <span className="text-sm sm:text-base xl:text-lg font-black bg-gradient-to-l from-[#FF854D] via-amber-200 to-white bg-clip-text text-transparent tracking-wide">
+          <span className="text-sm sm:text-base font-black bg-gradient-to-l from-[#FF854D] via-amber-200 to-white bg-clip-text text-transparent tracking-wide">
             ميساء تيسير مهنا
           </span>
         </div>
@@ -1139,11 +1253,11 @@ export default function App() {
               <i className="fa-solid fa-xmark" />
             </button>
 
-            {/* Mini UOSSM Header inside Modal */}
+            {/* Mini Header inside Modal */}
             <div className="flex items-center justify-center gap-2 mb-3 text-xs sm:text-sm font-bold text-slate-300">
-              <span>UOSSM CANADA</span>
-              <span className="text-[#EE6B33]">•</span>
-              <span>فقرة عجلة الحظ التفاعلية</span>
+              <span className="text-[#FF854D]">UOSSM CANADA</span>
+              <span>•</span>
+              <span className="text-emerald-400">ICNA Relief Canada</span>
             </div>
 
             {/* Top 3D Icon & Number Medallion */}
@@ -1531,7 +1645,7 @@ export default function App() {
                   حفظ نسخة الأوفلاين و GitHub
                 </h3>
                 <p className="text-xs sm:text-sm text-emerald-300 font-semibold">
-                  ملف HTML واحد مستقل تماماً (بداخله شعار UOSSM والألوان والأصوات بدون إنترنت)
+                  ملف HTML واحد مستقل تماماً (بداخله شعارات UOSSM و ICNA والألوان والأصوات بدون إنترنت)
                 </p>
               </div>
             </div>
@@ -1612,11 +1726,10 @@ export default function App() {
                 <span>طريقة بديلة مضمونة من أعلى شاشة AI Studio:</span>
               </h4>
               <p className="leading-relaxed">
-                إذا كانت نافذة المعاينة تمنع التنزيل المباشر في متصفحكِ، اضغطي على أيقونة{' '}
+                اضغطي على أيقونة{' '}
                 <strong className="text-white">تنزيل المشروع (Download ZIP)</strong> الموجودة في{' '}
-                <strong className="text-amber-300">أعلى يمين شاشة AI Studio الرئيسية</strong>، وعند فك الضغط ستجدين بداخل مجلد{' '}
-                <code className="text-emerald-300 font-mono">public</code> ملفاً جاهزاً اسمه{' '}
-                <code className="text-emerald-300 font-mono">uossm-wheel-standalone.html</code>{' '}
+                <strong className="text-amber-300">أعلى يمين شاشة AI Studio الرئيسية</strong>، وعند فك الضغط ستجدين في المجلد الرئيسي ملفاً جاهزاً اسمه{' '}
+                <code className="text-emerald-300 font-mono">uossm-wheel-offline.html</code>{' '}
                 يعمل أوفلاين 100% بمجرد النقر عليه مرتين!
               </p>
             </div>

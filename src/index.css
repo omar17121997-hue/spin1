@@ -4,6 +4,7 @@
   --uossm-orange: #EE6B33;
   --uossm-orange-bright: #FF854D;
   --uossm-orange-deep: #B84211;
+  --icna-green: #16A34A;
   --uossm-slate: #8D9BA8;
   --uossm-silver: #E2E8F0;
   --uossm-blue: #38BDF8;
@@ -16,17 +17,28 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-body {
+html,
+body,
+:fullscreen,
+:-webkit-full-screen {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   font-family: 'Cairo', 'Tajawal', sans-serif;
   background-color: var(--bg-deep);
   background-image: 
-    radial-gradient(circle at 72% 45%, rgba(238, 107, 51, 0.16) 0%, rgba(238, 107, 51, 0.04) 38%, transparent 68%),
-    radial-gradient(circle at 22% 30%, rgba(141, 155, 168, 0.16) 0%, rgba(56, 189, 248, 0.06) 40%, transparent 70%),
+    radial-gradient(circle at 75% 45%, rgba(238, 107, 51, 0.16) 0%, rgba(238, 107, 51, 0.04) 38%, transparent 68%),
+    radial-gradient(circle at 20% 35%, rgba(22, 163, 74, 0.12) 0%, rgba(56, 189, 248, 0.06) 42%, transparent 70%),
     radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.06) 0%, transparent 50%),
     linear-gradient(160deg, #070F1E 0%, #0E1D38 48%, #091326 100%);
   color: #ffffff;
-  min-height: 100vh;
   overflow-x: hidden;
+}
+
+::backdrop {
+  background-color: #070F1E;
 }
 
 /* 3D Extruded Icon Badge */
@@ -35,15 +47,15 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
+  border-radius: 14px;
   background: linear-gradient(145deg, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.04) 100%);
   border-top: 1.5px solid rgba(255, 255, 255, 0.65);
   border-left: 1px solid rgba(255, 255, 255, 0.35);
   border-right: 1px solid rgba(0, 0, 0, 0.25);
   border-bottom: 4px solid rgba(0, 0, 0, 0.45);
   box-shadow:
-    0 8px 16px -2px rgba(0, 0, 0, 0.55),
-    0 4px 0 0 rgba(15, 23, 42, 0.8),
+    0 6px 14px -2px rgba(0, 0, 0, 0.55),
+    0 3px 0 0 rgba(15, 23, 42, 0.8),
     inset 0 2px 4px rgba(255, 255, 255, 0.45),
     inset 0 -3px 6px rgba(0, 0, 0, 0.35);
   transform: perspective(500px) translateZ(0);
@@ -63,7 +75,7 @@ body {
 }
 
 .icon-3d-glyph {
-  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.55)) drop-shadow(0 1px 0 rgba(255, 255, 255, 0.4));
+  filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.55)) drop-shadow(0 1px 0 rgba(255, 255, 255, 0.4));
   transform: translateZ(12px);
   display: inline-block;
 }
@@ -72,10 +84,10 @@ body {
 .btn-3d-orange {
   background: linear-gradient(180deg, #FF854D 0%, #EE6B33 55%, #D4521B 100%);
   border-top: 1.5px solid rgba(255, 230, 215, 0.8);
-  border-bottom: 4px solid #8C310A;
+  border-bottom: 3.5px solid #8C310A;
   box-shadow:
-    0 6px 0 #7C2806,
-    0 12px 24px rgba(238, 107, 51, 0.45),
+    0 4px 0 #7C2806,
+    0 10px 20px rgba(238, 107, 51, 0.42),
     inset 0 2px 2px rgba(255, 255, 255, 0.45);
   transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
@@ -83,16 +95,16 @@ body {
 .btn-3d-orange:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow:
-    0 8px 0 #7C2806,
-    0 16px 30px rgba(238, 107, 51, 0.6),
+    0 6px 0 #7C2806,
+    0 14px 26px rgba(238, 107, 51, 0.58),
     inset 0 2px 3px rgba(255, 255, 255, 0.6);
 }
 
 .btn-3d-orange:active:not(:disabled) {
-  transform: translateY(4px);
+  transform: translateY(3px);
   box-shadow:
-    0 2px 0 #7C2806,
-    0 5px 12px rgba(238, 107, 51, 0.35),
+    0 1px 0 #7C2806,
+    0 4px 10px rgba(238, 107, 51, 0.35),
     inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
@@ -104,8 +116,8 @@ body {
   border-right: 1px solid rgba(226, 232, 240, 0.2);
   border-bottom: 3px solid #070E1B;
   box-shadow:
-    0 4px 0 #060C18,
-    0 8px 16px rgba(0, 0, 0, 0.45),
+    0 3px 0 #060C18,
+    0 6px 14px rgba(0, 0, 0, 0.45),
     inset 0 1px 1px rgba(255, 255, 255, 0.2);
   transition: all 0.15s ease;
 }
@@ -114,16 +126,16 @@ body {
   transform: translateY(-2px);
   border-top-color: rgba(238, 107, 51, 0.75);
   box-shadow:
-    0 6px 0 #060C18,
-    0 12px 20px rgba(238, 107, 51, 0.2),
+    0 5px 0 #060C18,
+    0 10px 18px rgba(238, 107, 51, 0.2),
     inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
 .btn-3d-slate:active {
   transform: translateY(2px);
   box-shadow:
-    0 2px 0 #060C18,
-    0 4px 8px rgba(0, 0, 0, 0.4);
+    0 1px 0 #060C18,
+    0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
 /* Wheel Stage Outer Aura */
@@ -132,24 +144,25 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  filter: drop-shadow(0 18px 38px rgba(0, 0, 0, 0.65)) drop-shadow(0 0 28px rgba(238, 107, 51, 0.28));
+  filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.65)) drop-shadow(0 0 24px rgba(238, 107, 51, 0.26));
 }
 
 .wheel-outer-glow {
   position: absolute;
-  inset: -14px;
+  inset: -12px;
   border-radius: 50%;
   background: conic-gradient(
     from 0deg,
     #EE6B33,
     #CBD5E1,
+    #16A34A,
     #38BDF8,
     #EE6B33,
     #F59E0B,
     #CBD5E1,
     #EE6B33
   );
-  filter: blur(20px);
+  filter: blur(18px);
   opacity: 0.48;
   z-index: 0;
   animation: pulseGlow 4.5s ease-in-out infinite alternate;
@@ -168,8 +181,8 @@ body {
   transform: translate(-50%, -50%);
   width: 24%;
   height: 24%;
-  min-width: 82px;
-  min-height: 82px;
+  min-width: 72px;
+  min-height: 72px;
   border-radius: 50%;
   background: radial-gradient(circle at 32% 28%, #FFFFFF 0%, #E2E8F0 42%, #94A3B8 85%, #475569 100%);
   border: 4px solid #EE6B33;
@@ -219,7 +232,7 @@ body {
 /* Pointer Arrow at Top */
 .wheel-pointer {
   position: absolute;
-  top: -22px;
+  top: -20px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 30;
@@ -239,26 +252,26 @@ body {
   border-top: 1px solid rgba(226, 232, 240, 0.28);
   border-left: 1px solid rgba(226, 232, 240, 0.14);
   border-right: 1px solid rgba(226, 232, 240, 0.14);
-  border-bottom: 4px solid rgba(5, 10, 22, 0.9);
+  border-bottom: 3.5px solid rgba(5, 10, 22, 0.9);
   box-shadow:
-    0 8px 18px -4px rgba(0, 0, 0, 0.5),
+    0 6px 14px -4px rgba(0, 0, 0, 0.5),
     inset 0 1px 1px rgba(255, 255, 255, 0.15);
-  transition: all 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .number-card:hover {
-  transform: translateY(-3px) scale(1.01);
+  transform: translateY(-2px) scale(1.01);
   border-top-color: rgba(238, 107, 51, 0.85);
   border-left-color: rgba(238, 107, 51, 0.45);
   border-right-color: rgba(238, 107, 51, 0.45);
   box-shadow:
-    0 14px 26px -4px rgba(238, 107, 51, 0.28),
-    0 4px 0 rgba(238, 107, 51, 0.4),
+    0 12px 22px -4px rgba(238, 107, 51, 0.28),
+    0 3px 0 rgba(238, 107, 51, 0.4),
     inset 0 1px 2px rgba(255, 255, 255, 0.3);
 }
 
 .number-card:hover .icon-3d-box {
-  transform: perspective(500px) translateY(-3px) rotateX(8deg) scale(1.07);
+  transform: perspective(500px) translateY(-2px) rotateX(8deg) scale(1.06);
 }
 
 .number-card.completed {
@@ -305,7 +318,7 @@ body {
 
 /* Custom Scrollbar */
 ::-webkit-scrollbar {
-  width: 7px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
   background: #070F1E;
